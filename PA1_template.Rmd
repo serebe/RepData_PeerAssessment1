@@ -1,25 +1,202 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research 1"
+author: "Sebastian Restrepo Betancur"
+date: "14/3/2022"
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Loading and preprocessing the data
+# Loading and preprocessing the data
+```{r}
+informacion<-read.csv("activity.csv",header=TRUE)
+```
+
+# What is mean total number of steps taken per day?
+
+## Calculate the total number of steps taken per day
+
+```{r}
+pasos<- aggregate(steps~date,informacion,sum) 
+pasos
+```
+
+## If you do not understand the difference between a histogram and a barplot, research the difference between them. Make a histogram of the total number of steps taken each day
+
+### barplot:
+
+A barplot (or barchart) is one of the most common types of graphic. It shows the relationship between a numeric and a categoric variable. Each entity of the categoric variable is represented as a bar. The size of the bar represents its numeric value.
+
+### Hist:
+
+A histogram is a graphical representation that organizes a group of data points into user-specified ranges. Similar in appearance to a bar graph, the histogram condenses a data series into an easily interpreted visual by taking many data points and grouping them into logical ranges or bins.
+
+the next is an steps histogram:
+
+```{r}
+hist(log10(informacion$steps),ylab= expression(paste("Frequency (",
+            log[10]," terms)")),xlab="pasos",main="steps Histogram")
+```
+## Calculate and report the mean and median of the total number of steps taken per day
+
+this result is without remove NA's
+
+```{r}
+medias<- aggregate(steps~date,informacion,mean) 
+medianas<-aggregate(steps~date,informacion,median) 
+colnames(medias)<- c("days","mean")
+colnames(medianas)<- c("days","median")
+juntos<- merge(medias,medianas)
+juntos
+```
+# Imputing missing values
+
+## Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with )
+
+```{r}
+sum(is.na(informacion))
+```
+## Devise a strategy for filling in all of the missing values in the dataset:
+
+```{r}
+for (iter in 1:length(informacion$interval)){
+  if(is.na(informacion[iter,1])){
+    for(iter2 in 1:length(juntos$mean)){
+      if(informacion[iter,2]==juntos[iter2,1]){
+        informacion[iter,1]<-juntos[iter2,2] 
+        break
+      }
+      else{
+        informacion[iter,1]<-mean(juntos$mean)
+      }
+    }
+  }
+}
+```
+## Create a new dataset that is equal to the original dataset but with the missing data filled in.
+
+```{r}
+head(informacion)
+```
+
+## Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+### the total number of steps taken each day
+
+```{r}
+totales<- aggregate(steps~date,informacion,sum) 
+totales
+hist(totales$steps,xlab="steps",main="total steps in every day",ylim = c(0,40))
+```
 
 
+### the mean and median total number of steps taken per day
 
-## What is mean total number of steps taken per day?
+the median 0 in some case is because there are some much cero's values
 
+```{r}
+medias2<- aggregate(steps~date,informacion,mean) 
+medianas2<-aggregate(steps~date,informacion,median) 
+colnames(medias2)<- c("days","mean")
+colnames(medianas2)<- c("days","median")
+juntos2<- merge(medias2,medianas2)
+juntos2
+```
+### Do these values differ from the estimates from the first part of the assignment?
 
+the values do differ quite a bit, especially in several cases in specific events such as the medians, this is because there are several variables in 0
 
-## What is the average daily activity pattern?
+### What is the impact of imputing missing data on the estimates of the total daily number of steps?
 
+It allows to improve the data a little and to be able to draw better conclusions
 
+# What is the average daily activity pattern?
 
-## Imputing missing values
+## Make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
 
+## Time Series plot of the average number of steps taken in a day.
+Calculating the average steps taken for each 5-minute interval.
+```{r}
+PASOS <- aggregate(steps ~ interval, data = informacion, mean)
+```
 
+Converting 'interval' column data to a vailid date-time format.
+```{r}
+PASOS$time <- as.character(PASOS$interval)
+for (i in 1:2){
+  PASOS$time[i] <- as.character(paste0("0",PASOS$time[i]))
+}
+for (i in 1:12){
+  PASOS$time[i] <- as.character(paste0("00",PASOS$time[i]))
+}
+for (i in 13:120){
+  PASOS$time[i] <- as.character(paste0("0",PASOS$time[i]))
+}
+PASOS$time <- as.POSIXct(PASOS$time, format = "%H%M")
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+Now that we have the valid date-time format we can have a cleaner looking time-series plot, for the average 24-hour period.
+
+```{r}
+library(ggplot2)
+library(lubridate)
+library(scales)
+plot2 <- ggplot(PASOS, aes(x = time, y = steps)) +
+  geom_line(col = "red") +
+  labs(title = "Time Series Plot", x = "Time of Day", y = "Steps") +
+  scale_x_datetime(labels = date_format("%H:%M", tz = "MST"), date_breaks = "4 hours")
+print(plot2)
+```
+
+## The 5-minute interval that on average contains the maximum number of steps
+
+```{r}
+PASOS[which.max(PASOS$steps),1:2]
+```
+
+# Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+informacion_semanas <- informacion
+informacion_semanas$days <- weekdays(as.Date(informacion_semanas$date))
+informacion_semanas$weekday <- as.character(rep(0, times=17568))
+for(x in 1:17568) {
+    if(informacion_semanas[x, 4] %in% c("Saturday", "Sunday")) {
+        informacion_semanas[x, 5] <- "weekend"
+    } else {
+        informacion_semanas[x, 5] <- "weekday"
+    }
+}
+informacion_semanas$weekday <- factor(informacion_semanas$weekday)
+head(informacion_semanas)
+```
+
+To compare the weekday and weekend data, and create two plots of the average number of steps taken per interval, the data has to be split into two groups of weekday/weekend data, using the newly created variable.
+
+```{r}
+weekdayData <- informacion_semanas[informacion_semanas$weekday=="weekday", ]
+weekendData <- informacion_semanas[informacion_semanas$weekday=="weekend", ]
+```
+
+Next, the average number of steps per interval is calculated, much like it has been done in previous questions.
+
+```{r}
+weekdayMean <- aggregate(steps ~ interval, weekdayData, mean)
+weekendMean <- aggregate(steps ~ interval, weekendData, mean)
+```
+
+Finally the panel plot is created. The x axis indicates each 5 minute interval, and the y axis shows the average number of steps taken. The two plots are divided into weekday, and weekend data.
+
+```{r}
+par(mfrow=c(2, 1), mar=c(4, 4.1, 3, 2.1))
+plot(weekdayMean$interval, weekdayMean$steps, type="l",
+     main="Time Series Plot for Weekdays",
+     xlab="Intervals (in 5 mins)", ylab="Number of Steps", family="serif",
+     col="blue", lwd=1.5, ylim=c(0, 230))
+plot(weekendMean$interval, weekendMean$steps, type="l",
+     main="Time Series Plot for Weekends",
+     xlab="Intervals (in 5 mins)", ylab="Number of Steps", family="serif",
+     col="red", lwd=1.5, ylim=c(0, 230))
+```
